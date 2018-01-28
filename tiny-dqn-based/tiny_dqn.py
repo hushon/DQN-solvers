@@ -17,7 +17,7 @@ parser.add_argument("-c", "--copy-steps", type=int, default=10000,
     help="number of training steps between copies of online DQN to target DQN")
 parser.add_argument("-r", "--render", action="store_true", default=False,
     help="render the game during training or testing")
-parser.add_argument("-p", "--path", default="my_dqn.ckpt",
+parser.add_argument("-p", "--path", default="./my_dqn.ckpt",
     help="path of the checkpoint file")
 parser.add_argument("-t", "--test", action="store_true", default=False,
     help="test (no learning and minimal epsilon)")
@@ -77,8 +77,7 @@ def q_network(X_state, name):
 input_height = 1
 input_width = 2
 input_channels = 1
-hidden_activation = tf.nn.relu
-n_outputs = env.action_space.n  # 9 discrete actions are available
+n_outputs = env.action_space.n  # 3 discrete actions are available
 num_outputs_list = [20, 10]
 activation_list = [tf.nn.relu, tf.nn.relu]
 
@@ -86,6 +85,7 @@ def q_network(X_state, name):
     prev_layer = X_state
     with tf.variable_scope(name) as scope:
         for num_outputs, activation in zip(num_outputs_list, activation_list):
+            print(prev_layer.get_shape())
             prev_layer = tf.contrib.layers.fully_connected(
                 prev_layer,
                 num_outputs,
@@ -101,6 +101,7 @@ def q_network(X_state, name):
                 outputs_collections=None,
                 trainable=True,
                 scope=None)
+
         outputs = tf.contrib.layers.fully_connected(
                 prev_layer,
                 n_outputs,
@@ -121,14 +122,11 @@ def q_network(X_state, name):
                                        scope=scope.name)
     trainable_vars_by_name = {var.name[len(scope.name):]: var
                               for var in trainable_vars}
+    print(outputs.get_shape())
     return outputs, trainable_vars_by_name
 
-
-
-
-# X_state = tf.placeholder(tf.float32, shape=[None, input_height, input_width,
-#                                             input_channels])
-X_state = tf.placeholder(tf.float32, shape=[None, input_height, input_width,])
+# X_state = tf.placeholder(tf.float32, shape=[None, input_height, input_width, input_channels])
+X_state = tf.placeholder(tf.float32, shape=[None, input_width])
 online_q_values, online_vars = q_network(X_state, name="q_networks/online")
 target_q_values, target_vars = q_network(X_state, name="q_networks/target")
 
@@ -185,10 +183,10 @@ def epsilon_greedy(q_values, step):
         return np.random.randint(n_outputs) # random action
     else:
         return np.argmax(q_values) # optimal action
-
+"""
 # We need to preprocess the images to speed up training
 mspacman_color = np.array([210, 164, 74]).mean()
-"""
+
 def preprocess_observation(obs):
     img = obs[1:176:2, ::2] # crop and downsize
     img = img.mean(axis=2) # to greyscale
@@ -198,13 +196,14 @@ def preprocess_observation(obs):
 """
 ## task2 implement preprocessor
 def preprocess_observation(obs):
-    return obs
+    # return obs.reshape(input_height, input_width, input_channels)
+    return obs.reshape(input_width)
 
 
 # TensorFlow - Execution phase
 training_start = 10000  # start training after 10,000 game iterations
 discount_rate = 0.99
-skip_start = 90  # Skip the start of every game (it's just waiting time).
+skip_start = 0  # Skip the start of every game (it's just waiting time).
 batch_size = 50
 iteration = 0  # game iterations
 done = True # env needs to be reset
@@ -272,6 +271,12 @@ with tf.Session() as sess:
         next_q_values = target_q_values.eval(
             feed_dict={X_state: X_next_state_val})
         max_next_q_values = np.max(next_q_values, axis=1, keepdims=True)
+        print(np.shape(next_q_values))
+        print(np.shape(rewards))
+        print(np.shape(continues))
+        print(np.shape(discount_rate))
+        print(np.shape(max_next_q_values))
+        print(np.shape(continues * discount_rate * max_next_q_values))
         y_val = rewards + continues * discount_rate * max_next_q_values
 
         # Train the online DQN
