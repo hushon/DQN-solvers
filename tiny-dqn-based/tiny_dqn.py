@@ -85,7 +85,7 @@ def q_network(X_state, name):
     prev_layer = X_state
     with tf.variable_scope(name) as scope:
         for num_outputs, activation in zip(num_outputs_list, activation_list):
-            print(prev_layer.get_shape())
+            # print(prev_layer.get_shape())
             prev_layer = tf.contrib.layers.fully_connected(
                 prev_layer,
                 num_outputs,
@@ -122,7 +122,7 @@ def q_network(X_state, name):
                                        scope=scope.name)
     trainable_vars_by_name = {var.name[len(scope.name):]: var
                               for var in trainable_vars}
-    print(outputs.get_shape())
+    # print(outputs.get_shape())
     return outputs, trainable_vars_by_name
 
 # X_state = tf.placeholder(tf.float32, shape=[None, input_height, input_width, input_channels])
@@ -197,7 +197,7 @@ def preprocess_observation(obs):
 ## task2 implement preprocessor
 def preprocess_observation(obs):
     # return obs.reshape(input_height, input_width, input_channels)
-    return obs.reshape(input_width)
+    return obs.reshape(-1)
 
 
 # TensorFlow - Execution phase
@@ -271,12 +271,12 @@ with tf.Session() as sess:
         next_q_values = target_q_values.eval(
             feed_dict={X_state: X_next_state_val})
         max_next_q_values = np.max(next_q_values, axis=1, keepdims=True)
-        print(np.shape(next_q_values))
-        print(np.shape(rewards))
-        print(np.shape(continues))
-        print(np.shape(discount_rate))
-        print(np.shape(max_next_q_values))
-        print(np.shape(continues * discount_rate * max_next_q_values))
+        # print(np.shape(next_q_values))
+        # print(np.shape(rewards))
+        # print(np.shape(continues))
+        # print(np.shape(discount_rate))
+        # print(np.shape(max_next_q_values))
+        # print(np.shape(continues * discount_rate * max_next_q_values))
         y_val = rewards + continues * discount_rate * max_next_q_values
 
         # Train the online DQN
