@@ -1,5 +1,5 @@
 ## Original implementation from https://github.com/ageron/tiny-dqn
-## Edited to solve OpenAIgym/MountainCar
+## Edited to solve OpenAI Gym classic environments by github.com/hushon
 
 from __future__ import division, print_function, unicode_literals
 
@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(
     description="Train a DQN net to play classic environments from OpenAI Gym.")
 parser.add_argument("-e", "--environment", action="store", default="MountainCar-v0",
     help="name of the Gym environment")
-parser.add_argument("-n", "--number-steps", type=int, default=4000000,
+parser.add_argument("-n", "--number-steps", type=int, default=10000,
     help="total number of training steps")
 parser.add_argument("-l", "--learn-iterations", type=int, default=4,
     help="number of game iterations between each training step")
@@ -207,7 +207,7 @@ def preprocess_observation(obs1, obs2):
 # def observation_stack():
 
 # TensorFlow - Execution phase
-training_start = 10000  # start training after 10,000 game iterations
+training_start = 0  # start training after 10,000 game iterations
 discount_rate = 0.99
 skip_start = 0  # Skip the start of every game (it's just waiting time).
 batch_size = 50
