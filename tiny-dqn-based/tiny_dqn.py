@@ -6,7 +6,7 @@ from __future__ import division, print_function, unicode_literals
 # Handle arguments (before slow imports so --help can be fast)
 import argparse
 parser = argparse.ArgumentParser(
-    description="Train a DQN net to play classic environments from OpenAI Gym.")
+    description="Train a DQN net to play OpenAI Gym classic environments.")
 parser.add_argument("-e", "--environment", action="store", default="MountainCar-v0",
     help="name of the Gym environment")
 parser.add_argument("-n", "--number-steps", type=int, default=10000,
@@ -35,51 +35,8 @@ import tensorflow as tf
 
 env = gym.make(args.environment)
 done = True  # env needs to be reset
-"""
+
 # First let's build the two DQNs (online & target)
-input_height = 88
-input_width = 80
-input_channels = 1
-conv_n_maps = [32, 64, 64]
-conv_kernel_sizes = [(8,8), (4,4), (3,3)]
-conv_strides = [4, 2, 1]
-conv_paddings = ["SAME"] * 3 
-conv_activation = [tf.nn.relu] * 3
-n_hidden_in = 64 * 11 * 10  # conv3 has 64 maps of 11x10 each
-n_hidden = 512
-hidden_activation = tf.nn.relu
-n_outputs = env.action_space.n  # 9 discrete actions are available
-initializer = tf.contrib.layers.variance_scaling_initializer()
-
-def q_network(X_state, name):
-    prev_layer = X_state
-    with tf.variable_scope(name) as scope:
-        for n_maps, kernel_size, strides, padding, activation in zip(
-                conv_n_maps, conv_kernel_sizes, conv_strides,
-                conv_paddings, conv_activation):
-            prev_layer = tf.layers.conv2d(
-                prev_layer, filters=n_maps, kernel_size=kernel_size,
-                strides=strides, padding=padding, activation=activation,
-                kernel_initializer=initializer)
-        last_conv_layer_flat = tf.reshape(prev_layer, shape=[-1, n_hidden_in])
-        hidden = tf.layers.dense(last_conv_layer_flat, n_hidden,
-                                 activation=hidden_activation,
-                                 kernel_initializer=initializer)
-        outputs = tf.layers.dense(hidden, n_outputs,
-                                  kernel_initializer=initializer)
-
-    trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope=scope.name)
-    trainable_vars_by_name = {var.name[len(scope.name):]: var
-                              for var in trainable_vars}
-    return outputs, trainable_vars_by_name
-"""
-
-## task1 Qnetwork implementation
-# obs_dim = env.observation_space.shape
-# input_height = 1
-# input_width = obs_dim[0]
-# input_channels = 1
 n_outputs = env.action_space.n  # 3 discrete actions are available
 num_outputs_list = [20, 10] # number of units in input layer and hidden layer
 activation_list = [tf.nn.relu, tf.nn.relu] # activation function in input layer and hidden layer
@@ -88,7 +45,6 @@ def q_network(X_state, name):
     prev_layer = X_state
     with tf.variable_scope(name) as scope:
         for num_outputs, activation in zip(num_outputs_list, activation_list):
-            # print(prev_layer.get_shape())
             prev_layer = tf.contrib.layers.fully_connected(
                 prev_layer,
                 num_outputs,
@@ -123,11 +79,8 @@ def q_network(X_state, name):
                                        scope=scope.name)
     trainable_vars_by_name = {var.name[len(scope.name):]: var
                               for var in trainable_vars}
-    # print(outputs.get_shape())
     return outputs, trainable_vars_by_name
 
-# X_state = tf.placeholder(tf.float32, shape=[None, input_height, input_width, input_channels])
-# state_shape = env.observation_space.shape
 state_shape = (2*np.prod(env.observation_space.shape), )
 X_state = tf.placeholder(tf.float32, shape=[None]+list(state_shape))
 online_q_values, online_vars = q_network(X_state, name="q_networks/online")
@@ -197,14 +150,10 @@ def preprocess_observation(obs):
     img = (img - 128) / 128 - 1 # normalize from -1. to 1.
     return img.reshape(88, 80, 1)
 """
-## task2 implement preprocessor
+## preprocessor stacks two observations and returnes a flattened array
 def preprocess_observation(obs1, obs2):
     obs_stacked = np.vstack((obs1, obs2))
     return obs_stacked.reshape(-1)
-    # return obs1.reshape(-1)
-
-## task 3 implement stacker
-# def observation_stack():
 
 # TensorFlow - Execution phase
 training_start = 0  # start training after 10,000 game iterations
@@ -279,12 +228,6 @@ with tf.Session() as sess:
         next_q_values = target_q_values.eval(
             feed_dict={X_state: X_next_state_val})
         max_next_q_values = np.max(next_q_values, axis=1, keepdims=True)
-        # print(np.shape(next_q_values))
-        # print(np.shape(rewards))
-        # print(np.shape(continues))
-        # print(np.shape(discount_rate))
-        # print(np.shape(max_next_q_values))
-        # print(np.shape(continues * discount_rate * max_next_q_values))
         y_val = rewards + continues * discount_rate * max_next_q_values
 
         # Train the online DQN
