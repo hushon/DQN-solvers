@@ -7,7 +7,7 @@ from __future__ import division, print_function, unicode_literals
 import argparse
 parser = argparse.ArgumentParser(
     description="Train a DQN net to play OpenAI Gym classic environments.")
-parser.add_argument("-e", "--environment", action="store", default="MountainCar-v0",
+parser.add_argument("-e", "--environment", action="store", default="CartPole-v0",
     help="name of the Gym environment")
 parser.add_argument("-n", "--number-steps", type=int, default=10000,
     help="total number of training steps")
@@ -19,7 +19,7 @@ parser.add_argument("-c", "--copy-steps", type=int, default=1000,
     help="number of training steps between copies of online DQN to target DQN")
 parser.add_argument("-r", "--render", action="store_true", default=False,
     help="render the game during training or testing")
-parser.add_argument("-p", "--path", default="./my_dqn.ckpt",
+parser.add_argument("-p", "--path", default="./CartPole-v0/my_dqn.ckpt",
     help="path of the checkpoint file")
 parser.add_argument("-t", "--test", action="store_true", default=False,
     help="test (no learning and minimal epsilon)")
@@ -27,6 +27,7 @@ parser.add_argument("-v", "--verbosity", action="count", default=0,
     help="increase output verbosity")
 args = parser.parse_args()
 
+from time import sleep
 from collections import deque
 import gym
 import numpy as np
@@ -38,7 +39,7 @@ done = True  # env needs to be reset
 
 # First let's build the two DQNs (online & target)
 n_outputs = env.action_space.n  # 3 discrete actions are available
-num_outputs_list = [20, 10] # number of units in input layer and hidden layer
+num_outputs_list = [200, 500] # number of units in input layer and hidden layer
 activation_list = [tf.nn.relu, tf.nn.relu] # activation function in input layer and hidden layer
 
 def q_network(X_state, name):
@@ -61,27 +62,27 @@ def q_network(X_state, name):
                 trainable=True,
                 scope=None)
         outputs = tf.contrib.layers.fully_connected(
-                prev_layer,
-                n_outputs,
-                activation_fn=tf.nn.relu,
-                normalizer_fn=None,
-                normalizer_params=None,
-                weights_initializer=tf.contrib.layers.xavier_initializer(),
-                weights_regularizer=None,
-                biases_initializer=tf.zeros_initializer(),
-                biases_regularizer=None,
-                reuse=None,
-                variables_collections=None,
-                outputs_collections=None,
-                trainable=True,
-                scope=None)
+            prev_layer,
+            n_outputs,
+            activation_fn=tf.nn.relu,
+            normalizer_fn=None,
+            normalizer_params=None,
+            weights_initializer=tf.contrib.layers.xavier_initializer(),
+            weights_regularizer=None,
+            biases_initializer=tf.zeros_initializer(),
+            biases_regularizer=None,
+            reuse=None,
+            variables_collections=None,
+            outputs_collections=None,
+            trainable=True,
+            scope=None)
     trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
                                        scope=scope.name)
     trainable_vars_by_name = {var.name[len(scope.name):]: var
                               for var in trainable_vars}
     return outputs, trainable_vars_by_name
 
-state_shape = (2*np.prod(env.observation_space.shape), )
+state_shape = (np.prod(env.observation_space.shape), )
 X_state = tf.placeholder(tf.float32, shape=[None]+list(state_shape))
 online_q_values, online_vars = q_network(X_state, name="q_networks/online")
 target_q_values, target_vars = q_network(X_state, name="q_networks/target")
@@ -129,8 +130,7 @@ def sample_memories(batch_size):
            cols[4].reshape(-1, 1))
 
 # And on to the epsilon-greedy policy with decaying epsilon
-eps_min = 0.1
-eps_max = 1.0 if not args.test else eps_min
+eps_min, eps_max = (0.1, 1.0) if not args.test else (0.0, 0.0)
 eps_decay_steps = args.number_steps // 2
 
 def epsilon_greedy(q_values, step):
@@ -139,25 +139,18 @@ def epsilon_greedy(q_values, step):
         return np.random.randint(n_outputs) # random action
     else:
         return np.argmax(q_values) # optimal action
-"""
-# We need to preprocess the images to speed up training
-mspacman_color = np.array([210, 164, 74]).mean()
 
-def preprocess_observation(obs):
-    img = obs[1:176:2, ::2] # crop and downsize
-    img = img.mean(axis=2) # to greyscale
-    img[img==mspacman_color] = 0 # Improve contrast
-    img = (img - 128) / 128 - 1 # normalize from -1. to 1.
-    return img.reshape(88, 80, 1)
-"""
+## We need to preprocess the images to speed up training
 ## preprocessor stacks two observations and returnes a flattened array
-def preprocess_observation(obs1, obs2):
-    obs_stacked = np.vstack((obs1, obs2))
-    return obs_stacked.reshape(-1)
+# def preprocess_observation(obs1, obs2):
+#     obs_stacked = np.vstack((obs1, obs2))
+#     return obs_stacked.reshape(-1)
+def preprocess_observation(obs1):
+    return obs1
 
 # TensorFlow - Execution phase
 training_start = 0  # start training after 10,000 game iterations
-discount_rate = 0.99
+discount_rate = 0.9
 skip_start = 0  # Skip the start of every game (it's just waiting time).
 batch_size = 50
 iteration = 0  # game iterations
@@ -186,28 +179,31 @@ with tf.Session() as sess:
             iteration, step, args.number_steps, step * 100 / args.number_steps,
             loss_val, mean_max_q), end="")
         if done: # game over, start again
+            print("Game over")
             obs = env.reset()
             for skip in range(skip_start): # skip the start of each game
                 obs, reward, done, info = env.step(0)
-            state = preprocess_observation(obs, obs)
+            state = preprocess_observation(obs)
             obs_old = obs
 
         if args.render:
             env.render()
+            sleep(0.05)
 
         # Online DQN evaluates what to do
         q_values = online_q_values.eval(feed_dict={X_state: [state]})
         action = epsilon_greedy(q_values, step)
-
+        print(("left", "stay", "right")[action])
         # Online DQN plays
         obs, reward, done, info = env.step(action)
-        next_state = preprocess_observation(obs, obs_old)
+        next_state = preprocess_observation(obs)
         obs_old = obs
 
         # Let's memorize what happened
         replay_memory.append((state, action, reward, next_state, 1.0 - done))
         state = next_state
 
+        # Skip below when executed in test mode
         if args.test:
             continue
 
