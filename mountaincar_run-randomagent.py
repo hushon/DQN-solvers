@@ -1,5 +1,12 @@
+## argument parser
+## pass an OpenAI Gym environment name to specify the environment
 import argparse
+parser = argparse.ArgumentParser(description="Run a random agent in an OpenAI Gym environment")
+parser.add_argument('-e', '--env-id', nargs='?', default='MountainCar-v0', help='Select an OpenAI Gym environment to run')
+args = parser.parse_args()
+
 import gym
+from time import sleep
 
 ## define agent
 class RandomAgent(object):
@@ -10,15 +17,7 @@ class RandomAgent(object):
         return self.action_space.sample()
 
 if __name__ == '__main__':
-
-    ## argument parser
-    ## pass an OpenAI Gym environment name to specify the environment
-    default_env = 'MountainCar-v0'
-    parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('env_id', nargs='?', default=default_env, help='Select the environment to run')
-    args = parser.parse_args()
-
-    ## define environment
+    ## make environment
     env = gym.make(args.env_id)
     env.reset()
 
@@ -34,6 +33,7 @@ if __name__ == '__main__':
         for st in range(max_step):
             obs, reward, done, _ = env.step(agent.act())
             env.render()
+            sleep(0.01)
             if done:
                 print("Terminated at step #", st)
                 break

@@ -13,9 +13,9 @@ parser.add_argument("-n", "--number-steps", type=int, default=10000,
     help="total number of training steps")
 parser.add_argument("-l", "--learn-iterations", type=int, default=4,
     help="number of game iterations between each training step")
-parser.add_argument("-s", "--save-steps", type=int, default=100,
+parser.add_argument("-s", "--save-steps", type=int, default=400,
     help="number of training steps between saving checkpoints")
-parser.add_argument("-c", "--copy-steps", type=int, default=1000,
+parser.add_argument("-c", "--copy-steps", type=int, default=100,
     help="number of training steps between copies of online DQN to target DQN")
 parser.add_argument("-r", "--render", action="store_true", default=False,
     help="render the game during training or testing")
@@ -30,11 +30,14 @@ args = parser.parse_args()
 from time import sleep
 from collections import deque
 import gym
+from gym import wrappers
 import numpy as np
 import os
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 env = gym.make(args.environment)
+# if args.test: env = wrappers.Monitor(env, args.path+'/cartpole-experiment-1')
 done = True  # env needs to be reset
 
 # First let's build the two DQNs (online & target)
@@ -162,6 +165,10 @@ game_length = 0
 total_max_q = 0
 mean_max_q = 0.0
 
+# for plotting loss
+plt.figure(1)
+loss_list = np.zeros(args.number_steps)
+
 with tf.Session() as sess:
     if os.path.isfile(args.path + ".index"):
         saver.restore(sess, args.path)
@@ -229,6 +236,7 @@ with tf.Session() as sess:
         # Train the online DQN
         _, loss_val = sess.run([training_op, loss], feed_dict={
             X_state: X_state_val, X_action: X_action_val, y: y_val})
+        loss_list[step] = loss_val
 
         # Regularly copy the online DQN to the target DQN
         if step % args.copy_steps == 0:
@@ -237,3 +245,6 @@ with tf.Session() as sess:
         # And save regularly
         if step % args.save_steps == 0:
             saver.save(sess, args.path)
+
+plt.plot(np.arange(args.number_steps), loss_list)
+plt.savefig('./CartPole-v0/loss_chart.png')
